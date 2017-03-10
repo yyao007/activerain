@@ -16,10 +16,10 @@ from activerain.items import postItem, userItem
 
 Base = declarative_base()
 class Posts(Base):
-    __tablename__ = 'forumposts1'
+    __tablename__ = 'forumposts'
     URL = Column(String(500), primary_key=True)
     replyid = Column(Integer, primary_key=True)
-    pid = Column(Integer) # post id    
+    pid = Column(Integer) # post id
     title = Column(String(500))
     category = Column(String(500)) # discussion category
     categoryURL = Column(String(500))
@@ -31,7 +31,7 @@ class Posts(Base):
     tags = Column(String(500))
 
 class Users(Base):
-    __tablename__ = 'forumusers1'
+    __tablename__ = 'forumusers'
     uid = Column(String(50), primary_key=True) # user id
     firstName = Column(String(200))
     lastName = Column(String(100))
@@ -56,25 +56,25 @@ class Users(Base):
 
 class ActiverainPipeline(object):
     def open_spider(self, spider):
-        connStr = 'mysql+mysqldb://root:931005@127.0.0.1/us'
+        connStr = 'mysql+mysqldb://root:home123@127.0.0.1/homeDB'
         self.engine = create_engine(connStr, convert_unicode=True, echo=False)
         self.DB_session = sessionmaker(bind=self.engine)
         self.session = self.DB_session()
         Base.metadata.create_all(self.engine)
         self.count = 0
-        
+
     def close_spider(self, spider):
         self.session.commit()
         self.session.close()
         self.engine.dispose()
-        
+
     def process_item(self, item, spider):
         if isinstance(item, postItem):
             return self.handlePost(item, spider)
         if isinstance(item, userItem):
             return self.handleUser(item, spider)
-                    
-    def handlePost(self, item, spider):     
+
+    def handlePost(self, item, spider):
         post = Posts(URL=item.get('URL'),
                      replyid=item.get('replyid'),
                      pid=item.get('pid'),
@@ -96,7 +96,7 @@ class ActiverainPipeline(object):
             raise
         finally:
             return item
-        
+
     def handleUser(self, item, spider):
         user =Users(uid=item.get('uid'),
                     firstName=item.get('firstName'),
@@ -116,17 +116,17 @@ class ActiverainPipeline(object):
             raise
         finally:
             return item
-            
+
 class DuplicatesPipeline(object):
     def __init__(self):
-        connStr = 'mysql+mysqldb://root:931005@127.0.0.1/us'
+        connStr = 'mysql+mysqldb://root:home123@127.0.0.1/homeDB'
         self.engine = create_engine(connStr, convert_unicode=True, echo=False)
         self.DB_session = sessionmaker(bind=self.engine)
         Base.metadata.create_all(self.engine)
         self.session = self.DB_session()
         self.users_seen = set()
         self.posts = set()
-        
+
     def process_item(self, item, spider):
         if isinstance(item, postItem):
             URL = item.get('URL')
@@ -137,32 +137,32 @@ class DuplicatesPipeline(object):
                 p = self.session.query(Posts).filter(Posts.URL == URL, Posts.replyid == replyid).first()
                 if p:
                     self.posts.add((URL, replyid))
-                    raise DropItem("Duplicate post found: ")                    
+                    raise DropItem("Duplicate post found: ")
                 else:
                     self.posts.add((URL, replyid))
                     return item
-                    
+
         if isinstance(item, userItem):
             uid = item.get('uid')
             if uid in self.users_seen:
-                raise DropItem('Duplicate user found: ')        
+                raise DropItem('Duplicate user found: ')
             else:
                 u = self.session.query(Users).filter(Users.uid == uid)
                 if u.first():
                     d = {'points': item.get('points'),
                          'account': item.get('account'),
                          'city': item.get('city'),
-                         'state': item.get('state'), 
+                         'state': item.get('state'),
                          'occupation': item.get('occupation'),
                     }
                     u.update(d)
                     self.session.commit()
                     self.users_seen.add(uid)
                     raise DropItem("Updating user: {0}".format(uid))
-                else:    
+                else:
                     self.users_seen.add(uid)
                     return item
-                
-                
-                
-            
+
+
+
+
