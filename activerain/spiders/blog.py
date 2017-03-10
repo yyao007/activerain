@@ -170,7 +170,8 @@ class BlogSpider(scrapy.Spider):
         location = c.xpath('.//div[@class="company"]/text()').extract()
         if location:
             l = location[0].split('-')[-1].strip()
-            item['city'], item['state'] = l.split(',') if l else (None, None)
+            if ',' in l:
+                item['city'], item['state'] = l.split(',') if l else (None, None)
         
         return item
         
