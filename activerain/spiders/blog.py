@@ -16,7 +16,7 @@ class BlogSpider(scrapy.Spider):
         since = self.settings.get('SINCE')
         self.start_urls = ['http://activerain.com/bloghome?filter=&since={0}'.format(since)]
         # self.start_urls = ['http://activerain.com/bloghome?filter=&page=185&since={0}'.format(since)]
-        
+
     def parse(self, response):
         blogs = response.xpath('//div[@class="result-snippet"]')
         nextPage = response.xpath('//a[@class="next_page"]/@href').extract()
@@ -32,11 +32,11 @@ class BlogSpider(scrapy.Spider):
             request = scrapy.Request(b['URL']+'?show_all=true', callback=self.parse_blogs, dont_filter=True)
             request.meta['blog'] = b
             yield request
-        
+
         if nextPage:
             next = response.urljoin(nextPage[0])
             yield scrapy.Request(next, callback=self.parse, dont_filter=True)
-    
+
     def parse_blogs(self, response):
         count = 0
         # parse blog
@@ -62,17 +62,17 @@ class BlogSpider(scrapy.Spider):
         likes = response.xpath('//div[@class="likes-count"]/text()').extract()
         if likes:
             item['likes'] = int(filter(unicode.isdigit, likes[0]))
-        
+
         category = response.xpath('//a[@class="tag"]')
         if category:
             item['category'] = category.xpath('text()').extract()[0]
             item['categoryURL'] = response.urljoin(category.xpath('@href').extract()[0])
-        
+
         tags = response.xpath('//dd[@class="tag"]//text()').extract()
         if tags:
             item['tags'] = '\t'.join([i.strip() for i in tags if i.strip()])
         yield item
-        
+
         # parse comments
         blog['replyid'] = {}
         comments = response.xpath('//div[@itemprop="comment"]')
@@ -95,7 +95,7 @@ class BlogSpider(scrapy.Spider):
             item['disPage'] = blog['blogPage']
             item['uid'] = uid
             replyid = c.xpath('div//a[@class="comment-index"]/text()').extract()
-            if replyid: 
+            if replyid:
                 item['replyid'] = int(filter(unicode.isdigit, replyid[0]))
             else:
                 item['replyid'] = count
@@ -110,7 +110,7 @@ class BlogSpider(scrapy.Spider):
             if likes:
                 item['likes'] = int(filter(unicode.isdigit, likes[0]))
             yield item
-            
+
         # parse comment comments
         if comments:
             url = 'http://activerain.com/blog_entries/{0}/blog_comment_comments'.format(blog['blogid'])
@@ -121,7 +121,7 @@ class BlogSpider(scrapy.Spider):
             request = scrapy.Request(url, callback=self.parse_comments, headers=h, dont_filter=True)
             request.meta['blog'] = blog
             yield request
-    
+
     def parse_author(self, response, disPage):
         item = userItem()
         item['disPage'] = disPage
@@ -134,21 +134,21 @@ class BlogSpider(scrapy.Spider):
             item['firstName'] = firstName[0]
         if lastName:
             item['lastName'] = lastName[0]
-        
+
         occupation = response.xpath('//div[@class="agent-details-col"]/div/text()').extract()
         if occupation:
             item['occupation'] = occupation[0].strip()
-            
+
         rainmaker = response.xpath('//div[@class="agent-mast-img"]/div')
         if rainmaker:
             item['account'], item['points'] = self.getRainmaker(rainmaker)
-        
+
         location = response.xpath('//div[@id="find_agents"]/p/a/@href').extract()
         if location:
             item['state'], item['city'] = [i.split('/')[-1] for i in location]
-            
+
         return item
-        
+
     def parse_user(self, c, disPage):
         item = userItem()
         item['disPage'] = disPage
@@ -162,18 +162,19 @@ class BlogSpider(scrapy.Spider):
         occupation = c.xpath('.//div[@class="tagline"]/text()').extract()
         if occupation:
             item['occupation'] = occupation[0].strip()
-            
+
         rainmaker = c.xpath('.//div[@class="comment-header"]/div')
         if rainmaker:
             item['account'], item['points'] = self.getRainmaker(rainmaker)
-        
+
         location = c.xpath('.//div[@class="company"]/text()').extract()
         if location:
             l = location[0].split('-')[-1].strip()
-            item['city'], item['state'] = l.split(',') if l else (None, None)
-        
+            if ',' in l:
+                item['city'], item['state'] = l.split(',') if l else (None, None)
+
         return item
-        
+
     def parse_comments(self, response):
         blog = response.meta['blog']
         count = blog['count']
@@ -198,16 +199,16 @@ class BlogSpider(scrapy.Spider):
                 request = scrapy.Request(url, callback=self.parse_mini_card, dont_filter=True)
                 request.meta['item'] = item
                 yield request
-    
+
     def parse_mini_card(self, response):
         pItem = response.meta['item']
         user = response.xpath('//a[@target="_blank"]/@href').extract()[0]
         uid = user.split('/')[-1]
         pItem['uid'] = uid
-        if uid in self.users:   
+        if uid in self.users:
             yield pItem
             return
-        
+
         self.users.add(uid)
         item = userItem()
         item['disPage'] = pItem['disPage']
@@ -219,44 +220,44 @@ class BlogSpider(scrapy.Spider):
         request.meta['item'] = item
         request.meta['pItem'] = pItem
         yield request
-        
+
     def parse_profile(self, response):
         item = response.meta['item']
         occupation = response.xpath('//h2[@class="userCard__userInfo-agent-subtitle"]/span/text()').extract()
         if occupation:
             item['occupation'] = occupation[0].strip()
-        
+
         location = response.xpath('//span[@class="userCard__userInfo-agent-market-location"]/text()').extract()
         location = [i.strip() for i in location if i.strip()]
         if location:
             item['city'], item['state'] = location[0].split(',')
-        
+
         rainmaker = response.xpath('//div[@class="userCard__content-userType-info"]/span/text()').extract()
         if rainmaker:
             item['account'] = rainmaker[0]
             item['points'] = int(filter(unicode.isdigit, rainmaker[1]))
-        
+
         yield item
         self.users.add(item['uid'])
         yield response.meta['pItem']
-        
+
     def getName(self, n):
         name = n.split()
         return name if len(name) == 2 else ['', name[0]] if len(name) == 1 else [' '.join(name[:-1]), name[-1]] if name else ['', '']
-        
-        
-    def getRainmaker(self, rainmaker):  
+
+
+    def getRainmaker(self, rainmaker):
         account = rainmaker[0].xpath('span/text()').extract()
         points = rainmaker[0].xpath('text()').extract()
         points = [int(filter(unicode.isdigit, i)) for i in points if i.strip()]
         return account + points if points else account + [None]
-        
-        
-        
-        
-        
-        
-            
-            
-            
-        
+
+
+
+
+
+
+
+
+
+
