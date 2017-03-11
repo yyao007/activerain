@@ -23,7 +23,7 @@ class Posts(Base):
     title = Column(String(500))
     category = Column(String(500)) # discussion category
     categoryURL = Column(String(500))
-    uid = Column(String(50), ForeignKey('forumusers1.uid', onupdate="CASCADE", ondelete='CASCADE')) # user id
+    uid = Column(String(50), ForeignKey('forumusers.uid', onupdate="CASCADE", ondelete='CASCADE')) # user id
     replyTo = Column(Integer) # This is the first post id of the discussion
     postTime = Column(DateTime(timezone=True)) # precise to hour eg. 2017-02-11 19:00:00
     body = Column(Text)
@@ -92,8 +92,8 @@ class ActiverainPipeline(object):
             self.session.add(post)
             self.session.commit()
         except:
-            self.session.rollback()
             raise
+            self.session.rollback()
         finally:
             return item
 
@@ -112,8 +112,8 @@ class ActiverainPipeline(object):
             self.session.add(user)
             self.session.commit()
         except:
-            self.session.rollback()
             raise
+            self.session.rollback()
         finally:
             return item
 
