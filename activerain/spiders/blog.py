@@ -8,7 +8,7 @@ import json
 
 class BlogSpider(scrapy.Spider):
     name = "blog"
-    allowed_domains = ["http://activerain.com"]
+    allowed_domains = ["activerain.com"]
 
     def __init__(self):
         self.users = set()
@@ -29,13 +29,13 @@ class BlogSpider(scrapy.Spider):
             b['blogid'] = blog.xpath('@data-id').extract()[0]
             b['title'] = blog.xpath('div/h2/a/text()').extract()[0]
             b['blogPage'] = response.url
-            request = scrapy.Request(b['URL']+'?show_all=true', callback=self.parse_blogs, dont_filter=True)
+            request = scrapy.Request(b['URL']+'?show_all=true', callback=self.parse_blogs)
             request.meta['blog'] = b
             yield request
 
         if nextPage:
             next = response.urljoin(nextPage[0])
-            yield scrapy.Request(next, callback=self.parse, dont_filter=True)
+            yield scrapy.Request(next, callback=self.parse)
 
     def parse_blogs(self, response):
         count = 0
@@ -58,6 +58,9 @@ class BlogSpider(scrapy.Spider):
         item['postTime'] = datetime.strptime(t, '%Y-%m-%dT%H:%M:%S')
         item['replyTo'] = 0
         body = response.xpath('//div[@itemprop="articleBody"]//text()').extract()
+        # handle re-blog
+        if not body:
+            body = response.xpath('//div[contains(@class, "blog-content")]//text()').extract()
         item['body'] = ''.join(body).strip()
         likes = response.xpath('//div[@class="likes-count"]/text()').extract()
         if likes:
@@ -184,6 +187,7 @@ class BlogSpider(scrapy.Spider):
                 count += 1
                 c = Selector(text=i)
                 item = postItem()
+                uItem = userItem()
                 item['URL'] = blog['URL']
                 item['title'] = blog['title']
                 item['disPage'] = blog['blogPage']
@@ -195,15 +199,24 @@ class BlogSpider(scrapy.Spider):
                 # Ignore deleted post
                 if not item['replyTo']:
                     continue
-                body = c.xpath('.//div[@class="blog-comment-comment-body"]//p//text()').extract()
+                body = c.xpath('.//div[@class="blog-comment-comment-body"]//text()').extract()
                 item['body'] = ''.join(body).strip()
                 uid = c.xpath('//div[@class="blog-comment-comment-details"]/div/@data-id').extract()[0]
+                item['uid'] = uid
+                uItem['uid'] = uid
+                name = c.xpath('//div[contains(@class, "agent-tag")]/text()').extract()[0]
+                uItem['firstName'], uItem['lastName'] = self.getName(name)
                 url = 'http://activerain.com/profile/{0}/mini_vcard'.format(uid)
                 request = scrapy.Request(url, callback=self.parse_mini_card, dont_filter=True)
                 request.meta['item'] = item
+                request.meta['uItem'] = uItem
                 yield request
 
     def parse_mini_card(self, response):
+        if response.status == 404:
+            yield response.meta['uItem']
+            yield response.meta['item']
+
         pItem = response.meta['item']
         user = response.xpath('//a[@target="_blank"]/@href').extract()[0]
         uid = user.split('/')[-1]
