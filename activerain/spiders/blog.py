@@ -191,7 +191,10 @@ class BlogSpider(scrapy.Spider):
                 item['replyid'] = count
                 t = c.xpath('.//meta[@itemprop="datePublished"]/@content').extract()[0]
                 item['postTime'] = datetime.strptime(t, '%Y-%m-%dT%H:%M:%S')
-                item['replyTo'] = blog['replyid'][id]
+                item['replyTo'] = blog['replyid'].get(id)
+                # Ignore deleted post
+                if not item['replyTo']:
+                    continue
                 body = c.xpath('.//div[@class="blog-comment-comment-body"]//p//text()').extract()
                 item['body'] = ''.join(body).strip()
                 uid = c.xpath('//div[@class="blog-comment-comment-details"]/div/@data-id').extract()[0]
