@@ -210,12 +210,14 @@ class BlogSpider(scrapy.Spider):
                 request = scrapy.Request(url, callback=self.parse_mini_card, dont_filter=True)
                 request.meta['item'] = item
                 request.meta['uItem'] = uItem
+                request.meta['handle_httpstatus_list'] = [404]
                 yield request
 
     def parse_mini_card(self, response):
-        if response.status == 404:
+        if response.status in response.meta['handle_httpstatus_list']:
             yield response.meta['uItem']
             yield response.meta['item']
+            return
 
         pItem = response.meta['item']
         user = response.xpath('//a[@target="_blank"]/@href').extract()[0]
