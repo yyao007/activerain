@@ -15,7 +15,7 @@ class BlogSpider(scrapy.Spider):
         self.settings = get_project_settings()
         since = self.settings.get('SINCE')
         self.start_urls = ['http://activerain.com/bloghome?filter=&since={0}'.format(since)]
-        # self.start_urls = ['http://activerain.com/bloghome?filter=&page=185&since={0}'.format(since)]
+        self.start_urls = ['http://activerain.com/bloghome?filter=&page=25980&since={0}'.format(since)]
 
     def parse(self, response):
         blogs = response.xpath('//div[@class="result-snippet"]')
@@ -62,7 +62,8 @@ class BlogSpider(scrapy.Spider):
         if not body:
             body = response.xpath('//div[contains(@class, "blog-content")]//text()').extract()
         item['body'] = ''.join(body).strip()
-        likes = response.xpath('//div[@class="likes-count"]/text()').extract()
+        likes = response.xpath('//div[@class="article-user-actions"]//div[@class="likes-count"]/text()').extract()
+        likes = [i.strip() for i in likes if i.strip()]
         if likes:
             item['likes'] = int(filter(unicode.isdigit, likes[0]))
 
@@ -155,13 +156,17 @@ class BlogSpider(scrapy.Spider):
     def parse_user(self, c, disPage):
         item = userItem()
         item['disPage'] = disPage
+
         user = c.xpath('div[@class="comment-left-section"]/a/@href').extract()
         if not user:
             user = c.xpath('.//div[@class="comment-author"]/text()').extract()
         item['uid'] = user[0].split('/')[-1]
         item['source'] = 'http://activerain.com' + user[0]
-        name = c.xpath('.//div[@class="comment-author"]/text()').extract()[0]
-        item['firstName'], item['lastName'] = self.getName(name)
+
+        name = c.xpath('.//div[@class="comment-author"]/text()').extract()
+        if name:
+            item['firstName'], item['lastName'] = self.getName(name[0])
+
         occupation = c.xpath('.//div[@class="tagline"]/text()').extract()
         if occupation:
             item['occupation'] = occupation[0].strip()
