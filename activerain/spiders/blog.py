@@ -13,13 +13,22 @@ class BlogSpider(scrapy.Spider):
     def __init__(self):
         self.users = set()
         self.settings = get_project_settings()
-        since = self.settings.get('SINCE')
-        self.start_urls = ['http://activerain.com/bloghome?filter=&since={0}'.format(since)]
-        self.start_urls = ['http://activerain.com/bloghome?filter=&page=25980&since={0}'.format(since)]
+        self.since = self.settings.get('SINCE')
+        self.start_urls = ['http://activerain.com/bloghome?filter=&since={0}'.format(self.since)]
+        self.start_urls = ['http://activerain.com/bloghome?filter=&page=29620&since={0}'.format(self.since)]
 
     def parse(self, response):
+        last_page = response.xpath('//div[@class="pagination"]/a[@rel="nofollow"]/text()').extract()
+        if last_page:
+            self.last_page = int(last_page[-1])
+        curr = response.url.split('&')[1].split('=')[-1]
+        request = scrapy.Request(response.url, callback=self.parse_pages)
+        request.meta['curr_page'] = int(curr)
+        yield request
+
+    def parse_pages(self, response):
         blogs = response.xpath('//div[@class="result-snippet"]')
-        nextPage = response.xpath('//a[@class="next_page"]/@href').extract()
+        #nextPage = response.xpath('//a[@class="next_page"]/@href').extract()
         for blog in blogs:
             URL = blog.xpath('@data-url').extract()
             if not URL:
@@ -33,9 +42,12 @@ class BlogSpider(scrapy.Spider):
             request.meta['blog'] = b
             yield request
 
-        if nextPage:
-            next = response.urljoin(nextPage[0])
-            yield scrapy.Request(next, callback=self.parse)
+        curr = response.meta['curr_page']
+        if curr < self.last_page:
+            next_page = 'http://activerain.com/bloghome?filter=&page={0}&since={1}'.format(int(curr)+1, self.since)
+            request = scrapy.Request(next_page, callback=self.parse_pages)
+            request.meta['curr_page'] = int(curr) + 1
+            yield request
 
     def parse_blogs(self, response):
         count = 0
