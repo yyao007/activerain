@@ -14,6 +14,7 @@ from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.ext.declarative import declarative_base
 from activerain.items import postItem, userItem
 
+connStr = 'mysql+mysqldb://yuan:931005@127.0.0.1/homeDB'
 Base = declarative_base()
 class Posts(Base):
     __tablename__ = 'forumposts'
@@ -56,12 +57,16 @@ class Users(Base):
 
 class ActiverainPipeline(object):
     def open_spider(self, spider):
-        connStr = 'mysql+mysqldb://root:home123@127.0.0.1/homeDB'
         self.engine = create_engine(connStr, convert_unicode=True, echo=False)
         self.DB_session = sessionmaker(bind=self.engine)
         self.session = self.DB_session()
         Base.metadata.create_all(self.engine)
         self.count = 0
+        spider.homeDB = self
+
+    def since(self):
+        lastPost = self.session.execute("select postTime from forumposts where url like '%activerain%' order by postTime desc limit 1;").first()[0]
+        return lastPost.strftime('%Y-%m-%d')
 
     def close_spider(self, spider):
         self.session.commit()
@@ -119,7 +124,6 @@ class ActiverainPipeline(object):
 
 class DuplicatesPipeline(object):
     def __init__(self):
-        connStr = 'mysql+mysqldb://root:home123@127.0.0.1/homeDB'
         self.engine = create_engine(connStr, convert_unicode=True, echo=False)
         self.DB_session = sessionmaker(bind=self.engine)
         Base.metadata.create_all(self.engine)
@@ -151,8 +155,8 @@ class DuplicatesPipeline(object):
                 if u.first():
                     d = {'points': item.get('points'),
                          'account': item.get('account'),
-                         'city': item.get('city'),
-                         'state': item.get('state'),
+                         #'city': item.get('city'),
+                         #'state': item.get('state'),
                          'occupation': item.get('occupation'),
                     }
                     u.update(d)

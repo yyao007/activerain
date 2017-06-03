@@ -3,7 +3,7 @@ import scrapy
 from activerain.items import postItem, userItem
 from datetime import datetime
 from scrapy.selector import Selector
-from scrapy.utils.project import get_project_settings
+# from scrapy.utils.project import get_project_settings
 import json
 
 class BlogSpider(scrapy.Spider):
@@ -11,18 +11,24 @@ class BlogSpider(scrapy.Spider):
     allowed_domains = ["activerain.com"]
 
     def __init__(self):
+        self.homeDB = None
         self.users = set()
-        self.settings = get_project_settings()
-        self.since = self.settings.get('SINCE')
-        self.start_urls = ['http://activerain.com/bloghome?filter=&since={0}'.format(self.since)]
-        self.start_urls = ['http://activerain.com/bloghome?filter=&page=29620&since={0}'.format(self.since)]
+        #self.settings = get_project_settings()
+
+    def start_requests(self):
+        self.since = self.homeDB.since()
+        self.start_urls = ['http://activerain.com/bloghome?filter=&page=1&since={0}'.format(self.since)]
+        #self.start_urls = ['http://activerain.com/bloghome?filter=&page=29620&since={0}'.format(self.since)]
+        for url in self.start_urls:
+            yield scrapy.Request(url, callback=self.parse)
+
 
     def parse(self, response):
         last_page = response.xpath('//div[@class="pagination"]/a[@rel="nofollow"]/text()').extract()
         if last_page:
             self.last_page = int(last_page[-1])
         curr = response.url.split('&')[1].split('=')[-1]
-        request = scrapy.Request(response.url, callback=self.parse_pages)
+        request = scrapy.Request(response.url, callback=self.parse_pages, dont_filter=True)
         request.meta['curr_page'] = int(curr)
         yield request
 
